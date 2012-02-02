@@ -1,9 +1,5 @@
-;;; import_static.clj -- import static Java methods/fields into Clojure
-
-;; by Stuart Sierra, http://stuartsierra.com/
-;; June 1, 2008
-
-;; Copyright (c) Stuart Sierra, 2008. All rights reserved.  The use
+;; Copyright (c) Stuart Sierra, 2008. (See README file for full list.)
+;; of contributors. All rights reserved.  The use
 ;; and distribution terms for this software are covered by the Eclipse
 ;; Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
 ;; which can be found in the file epl-v10.html at the root of this
@@ -11,13 +7,11 @@
 ;; agreeing to be bound by the terms of this license.  You must not
 ;; remove this notice, or any other, from this software.
 
-
-
 (ns 
   ^{:author "Stuart Sierra",
-     :doc "Import static Java methods/fields into Clojure"}
-  clojure.contrib.import-static
-            (:use clojure.set))
+    :doc "Import static Java methods/fields into Clojure"}
+  org.baznex.imports
+  (:use clojure.set))
 
 (defmacro import-static
   "Imports the named static fields and/or static methods of the class
