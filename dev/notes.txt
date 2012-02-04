@@ -1,0 +1,3 @@
+Instead of (Class/forName "java.lang.Math"), maybe (ns-resolve *ns* 'Math),
+since it's already a symbol and will respect existing imports (I think.) Also,
+returns nil instead of throwing exception on failure.
