@@ -7,7 +7,9 @@ used for importing static Java methods/fields into Clojure programs.
 
 Use the following dependency line in Leiningen:
 
-    [org.baznex/imports "1.0.0"]
+    [org.baznex/imports "1.3.0"]
+
+(Please ignore the "1.0.0" release, it was simply mis-versioned.)
 
 ## Building
 
