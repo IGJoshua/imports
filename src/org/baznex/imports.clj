@@ -11,7 +11,39 @@
   ^{:author "Stuart Sierra",
     :doc "Import static Java methods/fields into Clojure"}
   org.baznex.imports
-  (:use clojure.set))
+  (:use clojure.set)
+  (:import (java.lang.reflect Method Field Member Modifier)))
+
+(defn- assoc-meta
+  [metable & kvs]
+  {:pre [(instance? clojure.lang.IMeta metable)]}
+  (with-meta metable (apply assoc (meta metable) kvs)))
+
+(defn- def-sym
+  "Produce a private name (with minimal docs) for imported statics."
+  [^Class cls, ^String name]
+  (assoc-meta (symbol name)
+              :private true
+              :doc (str (.getCanonicalName cls) "/" name " via import-static")))
+
+(defn emit-methods
+  "Produce a definition form for a set of static methods with the same name."
+  [^Class cls, ^String name, meths]
+  (let [arities (distinct (map #(count (.getParameterTypes ^Method %)) meths))]
+    `(def ~(def-sym cls name)
+       (proxy [clojure.lang.AFn] []
+         ~@(for [ary arities]
+             (let [params (repeatedly ary (partial gensym 'p_))]
+               `(~'invoke [~@params]
+                          (. ~(symbol (.getName cls))
+                             ~(symbol name)
+                             ~@params))))))))
+
+(defn- emit-field
+  [^Class cls, ^Field fld]
+  {:pre [(instance? Field fld)]}
+  `(def ~(def-sym cls (.getName fld))
+     (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
 
 (defmacro import-static
   "Imports the named static fields and/or static methods of the class
@@ -25,33 +57,19 @@
       user=> (sqrt 16)
       4.0
 
-  Note: The class name must be fully qualified, even if it has already
-  been imported.  Static methods are defined as MACROS, not
-  first-class fns."
-  [class & fields-and-methods]
-  (let [only (set (map str fields-and-methods))
-        the-class (. Class forName (str class))
-        static? (fn [x]
-                    (. java.lang.reflect.Modifier
-                       (isStatic (. x (getModifiers)))))
-        statics (fn [array]
-                    (set (map (memfn getName)
-                              (filter static? array))))
-        all-fields (statics (. the-class (getFields)))
-        all-methods (statics (. the-class (getMethods)))
-        fields-to-do (intersection all-fields only)
-        methods-to-do (intersection all-methods only)
-        make-sym (fn [string]
-                     (with-meta (symbol string) {:private true}))
-        import-field (fn [name]
-                         (list 'def (make-sym name)
-                               (list '. class (symbol name))))
-        import-method (fn [name]
-                          (list 'defmacro (make-sym name)
-                                '[& args]
-                                (list 'list ''. (list 'quote class)
-                                      (list 'apply 'list
-                                            (list 'quote (symbol name))
-                                            'args))))]
-    `(do ~@(map import-field fields-to-do)
-         ~@(map import-method methods-to-do))))
+  Note: Reflection and primitive boxing will be used with all methods.
+  TODO: Only do that for methods whose signatures are not listed in
+    clojure.lang.IFn."
+  [class-sym & fields-and-methods]
+  (if-let [cls (resolve class-sym)]
+    (let [only (set (map str fields-and-methods))
+          todo? (fn [mem]
+                  (and (Modifier/isStatic (.getModifiers mem))
+                       (contains? only (.getName mem))))
+          fields (filter todo? (.getFields cls))
+          methods-by-name (group-by #(.getName ^Method %)
+                                    (filter todo? (.getMethods cls)))]
+      `(do ~@(map (partial emit-field cls) fields)
+           ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)))
+    (throw (ClassNotFoundException.
+            (str "Could not resolve class " class-sym " for static import.")))))

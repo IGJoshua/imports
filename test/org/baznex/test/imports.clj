@@ -9,7 +9,16 @@ we'd like, so for now all the imports happen in the same ns."
 ;; outside.
 (import-static java.lang.Math PI sqrt)
 
-(deftest test-import-static
+(deftest test-basic-import
   (is (number? (sqrt PI)))
-  (comment "FAILS because sqrt is imported as a macro:"
-           (is (== 2 (first (map sqrt [4 5 6]))))))
+  (is (== 2 (first (map sqrt [4 5 6])))))
+
+(deftest test-metadata
+  (is (:private (meta #'sqrt)))
+  (is (string? (:doc (meta #'sqrt))))
+  (is (:private (meta #'PI)))
+  (is (string? (:doc (meta #'PI)))))
+
+(import '(java.awt Color))
+(deftest test-resolve ;; shouldn't need full qualification of imported classes
+  (import-static Color decode))
