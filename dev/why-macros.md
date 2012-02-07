@@ -30,7 +30,7 @@ Some unsatisfying half-measures *could* be taken:
 
 * Restrict the user to methods that can be dispatched unambiguously (via a
   custom reification of `IFn`). Including Clojure 1.2.x support would mean
-  completely losig unboxed primitive support.
+  completely losing unboxed primitive support.
 * Import each overload with a user-specified name, e.g.
   `(import-static (Math {abs-long (abs long)}))`.
 * Dispatch on arity only (there's no `apply` for Java methods) and rely always
