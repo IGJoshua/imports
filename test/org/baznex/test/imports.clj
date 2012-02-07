@@ -9,16 +9,22 @@ we'd like, so for now all the imports happen in the same ns."
 ;; outside.
 (import-static java.lang.Math PI sqrt)
 
-(deftest test-basic-import
-  (is (number? (sqrt PI)))
-  (is (== 2 (first (map sqrt [4 5 6])))))
+(deftest test-deprecated-import
+  (is (number? (sqrt PI))))
+
+;;;; def-statics
+
+(def-statics Math E abs)
+
+(deftest test-def-statics
+  (is (= (map abs (range -2 3)) [2 1 0 1 2])))
 
 (deftest test-metadata
-  (is (:private (meta #'sqrt)))
-  (is (string? (:doc (meta #'sqrt))))
-  (is (:private (meta #'PI)))
-  (is (string? (:doc (meta #'PI)))))
+  (is (:private (meta #'abs)))
+  (is (string? (:doc (meta #'abs))))
+  (is (:private (meta #'E)))
+  (is (string? (:doc (meta #'E)))))
 
 (import '(java.awt Color))
 (deftest test-resolve ;; shouldn't need full qualification of imported classes
-  (import-static Color decode))
+  (def-statics Color decode))
