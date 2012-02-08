@@ -32,6 +32,34 @@ we'd like, so for now all the imports happen in the same ns."
        Float Object
        String Object))
 
+(defn the-method
+  [cls meth-name & types]
+  (.getMethod cls (name meth-name) (into-array Class types)))
+
+;; Note that we're testing against some instance methods (for convenience.)
+
+(deftest extraction-general ;; nothing eligible for prim-invoke
+  (are [meth sig] (= (extract-signature meth) sig)
+       ;; normalization
+       (the-method Math 'abs Float/TYPE)
+       {:prim nil, :ret Float/TYPE,
+        :param-hints [Object], :arg-hints [Float/TYPE]}))
+
+;; TODO: This test totally doesn't work (broken for 1.2)
+(if (= (:minor *clojure-version*) 3)
+  (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
+    (are [meth sig] (= (extract-signature meth) sig)
+         ;; nullary priminvoke
+         (the-method System 'currentTimeMillis)
+         {:prim clojure.lang.IFn$L, :ret Long/TYPE,
+          :param-hints [], :arg-hints []}))
+  (deftest extraction-1.2 ;; 1.2-specific: ignore .invokePrim
+    (are [meth sig] (= (extract-signature meth) sig)
+         ;; nullary priminvoke
+         (the-method System 'currentTimeMillis)
+         {:prim nil, :ret Object,
+          :param-hints [], :arg-hints []})))
+
 (def-statics Math E abs)
 
 (deftest test-def-statics
