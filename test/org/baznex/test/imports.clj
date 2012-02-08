@@ -14,6 +14,24 @@ we'd like, so for now all the imports happen in the same ns."
 
 ;;;; def-statics
 
+(deftest utils
+  (let [base ^{:a :b, :c :d} 'hello
+        with (assoc-meta base :c 5, :e :f)]
+    (is (= base with))
+    (is (= (assoc (meta base) :c 5, :e :f) (meta with)))))
+
+(deftest normalization
+  (are [in out] (= (normalize-param in) out)
+       Object Object
+       Long/TYPE Long/TYPE
+       Double/TYPE Double/TYPE
+       (class (long-array 0)) Object
+       Long Object
+       Double Object
+       (class (float 5)) Object
+       Float Object
+       String Object))
+
 (def-statics Math E abs)
 
 (deftest test-def-statics

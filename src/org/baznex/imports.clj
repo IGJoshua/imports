@@ -66,30 +66,52 @@
   {:pre [(instance? clojure.lang.IMeta metable)]}
   (with-meta metable (apply assoc (meta metable) kvs)))
 
-(defn ^:internal def-sym
+(defn ^:internal priv-sym
   "Produce a private name (with minimal docs) for imported statics."
   [^Class cls, ^String name]
   (assoc-meta (symbol name)
               :private true
               :doc (str (.getCanonicalName cls) "/" name " via def-statics")))
 
+;; Sample signature:
+;; {:prim true,
+;;  :ret Object,
+;;  :param-hints [Long/TYPE Double/TYPE Object]
+;; ?:arg-hints [Long/TYPE Double/TYPE String]
+;; }
+
+(defn ^:internal normalize-param
+  "Normalize a parameter's class to Long/TYPE, Double/TYPE, or Object."
+  [^Class cls]
+  (get #{Long/TYPE Double/TYPE} cls Object))
+
+(defn ^:internal invocation
+  "Produce a single invocation from a signature."
+  [^Class cls, ^String name, {:keys [prim ret param-hints arg-hints]}]
+  (let [proxargs (repeatedly (count param-hints) (partial gensym 'p_))]
+    `(~(with-meta 'invoke {:tag (if prim ret (normalize-param ret))})
+      [~@(map #(with-meta %1 {:tag %2}) proxargs param-hints)]
+        (. ~(symbol (.getName cls))
+           ~(symbol name)
+           ~@(if (seq arg-hints)
+               (map #(with-meta %1 {:tag %2}) proxargs arg-hints)
+               proxargs)))))
+
 (defn ^:internal emit-methods
   "Produce a definition form for a set of static methods with the same name."
   [^Class cls, ^String name, meths]
   (let [arities (distinct (map #(count (.getParameterTypes ^Method %)) meths))]
-    `(def ~(def-sym cls name)
+    `(def ~(priv-sym cls name)
        (proxy [clojure.lang.AFn] []
          ~@(for [ary arities]
-             (let [params (repeatedly ary (partial gensym 'p_))]
-               `(~'invoke [~@params]
-                          (. ~(symbol (.getName cls))
-                             ~(symbol name)
-                             ~@params))))))))
+             (invocation cls name {:prim false,
+                                   :ret Object,
+                                   :param-hints (repeat ary [Object])}))))))
 
 (defn ^:internal emit-field
   [^Class cls, ^Field fld]
   {:pre [(instance? Field fld)]}
-  `(def ~(def-sym cls (.getName fld))
+  `(def ~(priv-sym cls (.getName fld))
      (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
 
 (defmacro ^{:since "1.4.0"} def-statics
