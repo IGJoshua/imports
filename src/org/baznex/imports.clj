@@ -61,11 +61,6 @@
 
 ;;;; helpers
 
-(defn ^:internal assoc-meta
-  [metable & kvs]
-  {:pre [(instance? clojure.lang.IMeta metable)]}
-  (with-meta metable (apply assoc (meta metable) kvs)))
-
 (def capable-prim-invoke?
   (or (< 1 (:major *clojure-version*))
       (< 2 (:minor *clojure-version*))))
@@ -75,9 +70,10 @@
 (defn ^:internal priv-sym
   "Produce a private name (with minimal docs) for imported statics."
   [^Class cls, ^String name]
-  (assoc-meta (symbol name)
-              :private true
-              :doc (str (.getCanonicalName cls) "/" name " via def-statics")))
+  (vary-meta (symbol name)
+             assoc
+             :private true
+             :doc (str (.getCanonicalName cls) "/" name " via def-statics")))
 
 ;; Sample signature:
 ;; {:prim true,

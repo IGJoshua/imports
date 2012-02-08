@@ -14,12 +14,6 @@ we'd like, so for now all the imports happen in the same ns."
 
 ;;;; def-statics
 
-(deftest utils
-  (let [base ^{:a :b, :c :d} 'hello
-        with (assoc-meta base :c 5, :e :f)]
-    (is (= base with))
-    (is (= (assoc (meta base) :c 5, :e :f) (meta with)))))
-
 (deftest normalization
   (are [in out] (= (normalize-param in) out)
        Object Object
@@ -47,14 +41,12 @@ we'd like, so for now all the imports happen in the same ns."
 
 (if capable-prim-invoke?
   (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
-    (println "Testing 1.3")
     (are [meth sig] (= (extract-signature meth) sig)
          ;; nullary priminvoke
          (the-method System 'currentTimeMillis)
          {:prim clojure.lang.IFn$L, :ret Long/TYPE,
           :param-hints [], :arg-hints []}))
   (deftest extraction-1.2 ;; 1.2-specific: ignore .invokePrim
-    (println "Testing 1.2")
     (are [meth sig] (= (extract-signature meth) sig)
          ;; nullary priminvoke
          (the-method System 'currentTimeMillis)
