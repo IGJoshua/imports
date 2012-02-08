@@ -45,19 +45,20 @@ we'd like, so for now all the imports happen in the same ns."
        {:prim nil, :ret Float/TYPE,
         :param-hints [Object], :arg-hints [Float/TYPE]}))
 
-;; TODO: This test totally doesn't work (broken for 1.2)
-(if (= (:minor *clojure-version*) 3)
+(if capable-prim-invoke?
   (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
+    (println "Testing 1.3")
     (are [meth sig] (= (extract-signature meth) sig)
          ;; nullary priminvoke
          (the-method System 'currentTimeMillis)
          {:prim clojure.lang.IFn$L, :ret Long/TYPE,
           :param-hints [], :arg-hints []}))
   (deftest extraction-1.2 ;; 1.2-specific: ignore .invokePrim
+    (println "Testing 1.2")
     (are [meth sig] (= (extract-signature meth) sig)
          ;; nullary priminvoke
          (the-method System 'currentTimeMillis)
-         {:prim nil, :ret Object,
+         {:prim nil, :ret Long/TYPE,
           :param-hints [], :arg-hints []})))
 
 (def-statics Math E abs)

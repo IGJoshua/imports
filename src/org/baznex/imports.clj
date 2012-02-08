@@ -59,12 +59,18 @@
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
 
-;;;; def-statics
+;;;; helpers
 
 (defn ^:internal assoc-meta
   [metable & kvs]
   {:pre [(instance? clojure.lang.IMeta metable)]}
   (with-meta metable (apply assoc (meta metable) kvs)))
+
+(def capable-prim-invoke?
+  (or (< 1 (:major *clojure-version*))
+      (< 2 (:minor *clojure-version*))))
+
+;;;; def-statics
 
 (defn ^:internal priv-sym
   "Produce a private name (with minimal docs) for imported statics."
@@ -91,7 +97,7 @@
   "Find a subinterface of IFn that provides a primitive invocation method,
 e.g. IFn$LOLD. Return type and params are assumed to be normalized already."
   [ret params]
-  (when (resolve 'clojure.lang.IFn$LDLOL) ;; feature check
+  (when capable-prim-invoke?
     (when (and (<= (count params) 4)
                (or (contains? invocable-prims ret)
                    (some invocable-prims params)))
