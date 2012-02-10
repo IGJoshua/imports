@@ -3,6 +3,9 @@
 The unofficial new home of clojure.contrib.import-static,
 used for importing static Java methods/fields into Clojure programs.
 
+Please note that "importing" static fields is implemented by copying
+them to private vars in the namespace -- this blocks inlining.
+
 ## Usage
 
 Use the following dependency line in Leiningen:
@@ -14,6 +17,12 @@ Use the following dependency line in Leiningen:
 ## Building
 
 Built with Leiningen v1.x.
+
+## Changelog
+
+### v1.3.0
+* Original version from Clojure Contrib (hence the version string)
+* Produces macros
 
 ## License
 
