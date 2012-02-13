@@ -3,7 +3,9 @@
 to pollute this ns. However, that turns out to be more complicated than
 we'd like, so for now all the imports happen in the same ns."
   (:use clojure.test
-        org.baznex.imports))
+        org.baznex.test.utils
+        org.baznex.imports)
+  (:import (org.baznex.test.imports Statics)))
 
 ;; Due to some limitations of deftest, these imports apparently have to go
 ;; outside.
@@ -11,6 +13,20 @@ we'd like, so for now all the imports happen in the same ns."
 
 (deftest test-deprecated-import
   (is (number? (sqrt PI))))
+
+(import-static org.baznex.test.imports.Statics over)
+
+(defmacro over*
+  "Call Statics/over with the given args, returning a message from the
+invoked method about the signature that was used."
+  [& args]
+  `(talkback (over ~@args)))
+
+(deftest test-overloads
+  (are [call sig] (= call sig)
+       (over*) "O"
+       (over* (int 5)) "O/int"
+       (over* (long 5)) "O/long"))
 
 ;;;; def-statics
 
