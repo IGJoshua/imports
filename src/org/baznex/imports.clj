@@ -78,8 +78,8 @@
 ;; Sample signature:
 ;; {:prim true,
 ;;  :ret Object,
-;;  :param-hints [Long/TYPE Double/TYPE Object]
-;; ?:arg-hints [Long/TYPE Double/TYPE String] ; optional
+;;  :params [Long/TYPE Double/TYPE Object]
+;; ?:args [Long/TYPE Double/TYPE String] ; optional
 ;; }
 
 (def ^:internal invocable-prims #{Long/TYPE Double/TYPE})
@@ -104,10 +104,10 @@ e.g. IFn$LOLD. Return type and params are assumed to be normalized already."
 (defn ^:internal extract-signature
   "Given a method, return the signature as a map of :prim (IFn subinterface
 that this invocation can match, or nil), :ret (declared class of return type),
-and :param-hints (sequence of classes of parameters for invocation), and
-:arg-hints (sequence of the declared parameter classes of the static method.)
+and :params (sequence of classes of parameters for invocation), and
+:args (sequence of the declared parameter classes of the static method.)
 
-:arg-hints is intended for use when the dispatch is unambiguous but the
+:args is intended for use when the dispatch is unambiguous but the
 actual parameters of the static method are narrower than what invoke or
 invokePrim can provide."
   [^Method meth]
@@ -116,19 +116,19 @@ invokePrim can provide."
         par-norm (map normalize-param par-actual)]
     {:prim (find-prim-invoke (normalize-param ret-type) par-norm)
      :ret ret-type
-     :param-hints par-norm
-     :arg-hints par-actual}))
+     :params par-norm
+     :args par-actual}))
 
 (defn ^:internal invocation
   "Produce a single invocation from a signature."
-  [^Class cls, ^String name, {:keys [prim ret param-hints arg-hints]}]
-  (let [proxargs (repeatedly (count param-hints) (partial gensym 'p_))]
+  [^Class cls, ^String name, {:keys [prim ret params args]}]
+  (let [proxargs (repeatedly (count params) (partial gensym 'p_))]
     `(~(with-meta 'invoke {:tag ret}) ;;TODO: Need to normalize ret when !prim?
-      [~@(map #(with-meta %1 {:tag %2}) proxargs param-hints)]
+      [~@(map #(with-meta %1 {:tag %2}) proxargs params)]
         (. ~(symbol (.getName cls))
            ~(symbol name)
-           ~@(if (seq arg-hints)
-               (map #(with-meta %1 {:tag %2}) proxargs arg-hints)
+           ~@(if (seq args)
+               (map #(with-meta %1 {:tag %2}) proxargs args)
                proxargs)))))
 
 (defn ^:internal emit-methods
@@ -140,7 +140,7 @@ invokePrim can provide."
          ~@(for [ary arities]
              (invocation cls name {:prim false,
                                    :ret Object,
-                                   :param-hints (repeat ary [Object])}))))))
+                                   :params (repeat ary [Object])}))))))
 
 (defn ^:internal emit-field
   [^Class cls, ^Field fld]

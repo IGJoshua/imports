@@ -46,7 +46,7 @@ we'd like, so for now all the imports happen in the same ns."
        ;; normalization
        (the-method Math 'abs Float/TYPE)
        {:prim nil, :ret Float/TYPE,
-        :param-hints [Object], :arg-hints [Float/TYPE]}))
+        :params [Object], :args [Float/TYPE]}))
 
 (if capable-prim-invoke?
   (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
@@ -54,13 +54,13 @@ we'd like, so for now all the imports happen in the same ns."
          ;; nullary priminvoke
          (the-method System 'currentTimeMillis)
          {:prim clojure.lang.IFn$L, :ret Long/TYPE,
-          :param-hints [], :arg-hints []}))
+          :params [], :args []}))
   (deftest extraction-1.2 ;; 1.2-specific: ignore .invokePrim
     (are [meth sig] (= (extract-signature meth) sig)
          ;; nullary priminvoke
          (the-method System 'currentTimeMillis)
          {:prim nil, :ret Long/TYPE,
-          :param-hints [], :arg-hints []})))
+          :params [], :args []})))
 
 (def-statics Math E abs)
 
