@@ -48,6 +48,22 @@ we'd like, so for now all the imports happen in the same ns."
        {:prim nil, :ret Float/TYPE,
         :params [Object], :args [Float/TYPE]}))
 
+(deftest test-normalize-signatures
+  (are [sigs norm-sigs] (= (normalize-signatures sigs) norm-sigs)
+       [{:prim clojure.lang.IFn$LL :ret Long/TYPE :params [Long/TYPE]
+         :args [Long/TYPE]}
+        {:prim clojure.lang.IFn$DD :ret Double/TYPE :params [Double/TYPE]
+         :args [Double/TYPE]}
+        {:prim nil :ret Float/TYPE :params [Object]
+         :args [Float/TYPE]}
+        {:prim nil :ret Integer/TYPE :params [Object]
+         :args [Integer/TYPE]}]
+       [{:prim clojure.lang.IFn$LL :ret Long/TYPE :params [Long/TYPE]
+         :args [Long/TYPE]}
+        {:prim clojure.lang.IFn$DD :ret Double/TYPE :params [Double/TYPE]
+         :args [Double/TYPE]}
+        {:prim nil :ret Object :params [Object] :args nil}]))
+
 (if capable-prim-invoke?
   (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
     (are [meth sig] (= (extract-signature meth) sig)
