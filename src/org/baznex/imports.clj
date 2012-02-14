@@ -55,3 +55,12 @@
                                             'args))))]
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
+
+;;;; Renaming imports
+
+(defn import-renaming*
+  "Given a map of classes to symbols, import the classes under the symbol
+names into the provided namespace."
+  [^clojure.lang.Namespace ns, imports]
+  (doseq [[^Class cls, ^clojure.lang.Symbol sym] imports]
+    (.importClass ns sym cls)))
