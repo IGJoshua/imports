@@ -119,24 +119,24 @@ invokePrim can provide."
      :params par-norm
      :args par-actual}))
 
-(defn ^:internal normalize-signature
-  "Takes a signature map as argument. If it represents a primitive signature, it
-  is returned unaltered. Otherwise, it is transformed into a form suitable for
-  non-primitive invoke."
-  [sig]
-  (if (:prim sig)
-    sig
-    {:prim nil
-     :ret Object
-     :params (vec (repeat (count (:params sig)) Object))
-     :args nil}))
-
 (defn ^:internal normalize-signatures
   "Takes a seq of signature maps and returns a new seq of signature maps
   containing those maps whose :prim key was non-nil and replaces the rest with
   non-primitive versions with duplicates removed."
   [sigs]
-  (distinct (map normalize-signature sigs)))
+  (let [prims (filter #(:prim %) sigs)
+        nonprims (filter #(nil? (:prim %)) sigs)
+        by-num-args (group-by #(count (:params %)) nonprims)
+        normnonprims (doto (for [[k v] (seq by-num-args)
+                                 :let [sig {:prim nil
+                                            :ret Object
+                                            :params (vec (repeat k Object))
+                                            :args nil}]]
+                             (if (= 1 (count v))
+                               (assoc sig :args (:args (first v))
+                                      :ret (:ret (first v)))
+                               sig)) prn)]
+    (concat prims normnonprims)))
 
 (defn ^:internal invocation
   "Produce a single invocation from a signature."

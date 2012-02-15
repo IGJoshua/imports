@@ -70,15 +70,17 @@ invoked method about the signature that was used."
          :args [Long/TYPE]}
         {:prim clojure.lang.IFn$DD :ret Double/TYPE :params [Double/TYPE]
          :args [Double/TYPE]}
-        {:prim nil :ret Float/TYPE :params [Object]
-         :args [Float/TYPE]}
-        {:prim nil :ret Integer/TYPE :params [Object]
-         :args [Integer/TYPE]}]
+        {:prim nil :ret Float/TYPE :params [Object] :args [Float/TYPE]}
+        {:prim nil :ret Integer/TYPE :params [Object] :args [Integer/TYPE]}
+        {:prim nil :ret Void/TYPE :params [Object Object]
+         :args [String String]}]
        [{:prim clojure.lang.IFn$LL :ret Long/TYPE :params [Long/TYPE]
          :args [Long/TYPE]}
         {:prim clojure.lang.IFn$DD :ret Double/TYPE :params [Double/TYPE]
          :args [Double/TYPE]}
-        {:prim nil :ret Object :params [Object] :args nil}]))
+        {:prim nil :ret Object :params [Object] :args nil}
+        {:prim nil :ret Void/TYPE :params [Object Object]
+         :args [String String]}]))
 
 (if capable-prim-invoke?
   (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
