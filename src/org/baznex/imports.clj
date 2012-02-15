@@ -58,7 +58,7 @@
 
 ;;;; Renaming imports
 
-(defn import-renaming*
+(defn import-renaming
   "Given a map of classes to symbols, import the classes under the symbol
 names. For example, an input of {java.lang.Math 'M} would permit expressions
 like (M/sqrt 5) inside subsequent top-level forms."
