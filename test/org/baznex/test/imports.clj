@@ -3,17 +3,16 @@
 to pollute this ns. However, that turns out to be more complicated than
 we'd like, so for now all the imports happen in the same ns."
   (:use clojure.test
-        org.baznex.imports))
+        [org.baznex.imports :as i]))
 
-;; Due to some limitations of deftest, these imports apparently have to go
-;; outside.
-(import-static java.lang.Math PI sqrt)
-
+;; Imports and other evaluation modifiers must be top-level forms
+;; (or direct subforms of top-level 'do forms.)
+(i/import-static java.lang.Math PI sqrt)
 (deftest test-import-static
   (is (number? (sqrt PI)))
   (comment "FAILS because sqrt is imported as a macro:"
            (is (== 2 (first (map sqrt [4 5 6]))))))
 
-(import-renaming {java.lang.Math 'M})
+(i/rename {java.lang.Math 'M})
 (deftest renaming
   (is (number? (M/sqrt 5))))

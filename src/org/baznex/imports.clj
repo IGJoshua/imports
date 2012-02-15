@@ -9,7 +9,7 @@
 
 (ns org.baznex.imports
   "Import static Java methods/fields into Clojure"
-  (:use clojure.set))
+  (:use [clojure.set :only (intersection)]))
 
 (defmacro import-static
   "Imports the named static fields and/or static methods of the class
@@ -56,7 +56,7 @@
 
 ;;;; Renaming imports
 
-(defn import-renaming
+(defn rename
   "Given a map of classes to symbols, import the classes under the symbol
 names. For example, an input of {java.lang.Math 'M} would permit expressions
 like (M/sqrt 5) inside subsequent top-level forms."
