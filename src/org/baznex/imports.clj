@@ -55,3 +55,13 @@
                                             'args))))]
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
+
+;;;; Renaming imports
+
+(defn import-renaming
+  "Given a map of classes to symbols, import the classes under the symbol
+names. For example, an input of {java.lang.Math 'M} would permit expressions
+like (M/sqrt 5) inside subsequent top-level forms."
+  [imports]
+  (doseq [[^Class cls, ^clojure.lang.Symbol sym] imports]
+    (.importClass *ns* sym cls)))

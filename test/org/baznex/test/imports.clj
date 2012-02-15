@@ -13,3 +13,7 @@ we'd like, so for now all the imports happen in the same ns."
   (is (number? (sqrt PI)))
   (comment "FAILS because sqrt is imported as a macro:"
            (is (== 2 (first (map sqrt [4 5 6]))))))
+
+(import-renaming {java.lang.Math 'M})
+(deftest renaming
+  (is (number? (M/sqrt 5))))
