@@ -1,7 +1,9 @@
 # org.baznex/imports
 
-The unofficial new home of clojure.contrib.import-static,
-used for importing static Java methods/fields into Clojure programs.
+A collection of utilities around importing Java classes.
+
+This is the unofficial new home of clojure.contrib.import-static,
+used for "importing" static Java methods/fields into Clojure programs.
 
 Please note that "importing" static fields is implemented by copying
 them to private vars in the namespace -- this blocks inlining.
@@ -10,7 +12,7 @@ them to private vars in the namespace -- this blocks inlining.
 
 Use the following dependency line in Leiningen:
 
-    [org.baznex/imports "1.3.0"]
+    [org.baznex/imports "1.4.0"]
 
 (Please ignore the "1.0.0" release, it was simply mis-versioned.)
 
@@ -23,6 +25,9 @@ Built with Leiningen v1.x.
 ### v1.3.0
 * Original version from Clojure Contrib (hence the version string)
 * Produces macros
+
+### v1.4.0
+* Added: org.baznex.imports/rename
 
 ## License
 
