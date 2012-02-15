@@ -7,10 +7,8 @@
 ;; agreeing to be bound by the terms of this license.  You must not
 ;; remove this notice, or any other, from this software.
 
-(ns 
-    ^{:author "Stuart Sierra",
-      :doc "Import static Java methods/fields into Clojure"}
-  org.baznex.imports
+(ns org.baznex.imports
+  "Import static Java methods/fields into Clojure"
   (:use clojure.set)
   (:import (java.lang.reflect Method Field Modifier)))
 
