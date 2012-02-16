@@ -96,7 +96,7 @@ e.g. IFn$LOLD. Return type and params are assumed to be normalized already."
                (or (contains? invocable-prims ret)
                    (some invocable-prims params)))
       (let [subtype (apply str (map {Object \O, Long/TYPE \L, Double/TYPE \D}
-                                    (conj params ret)))]
+                                    (concat params [ret])))]
         (resolve (symbol (str "clojure.lang.IFn$" subtype)))))))
 
 (defn ^:internal extract-signature

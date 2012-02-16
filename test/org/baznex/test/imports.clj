@@ -64,6 +64,22 @@ invoked method about the signature that was used."
        {:prim nil, :ret Float/TYPE,
         :params [Object], :args [Float/TYPE]}))
 
+(if capable-prim-invoke?
+  (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
+    (are [meth sig] (= (extract-signature meth) sig)
+         ;; nullary priminvoke
+         (the-method System 'currentTimeMillis)
+         {:prim clojure.lang.IFn$L, :ret Long/TYPE, :params [], :args []}
+         (the-method String 'valueOf Double/TYPE)
+         {:prim clojure.lang.IFn$DO, :ret String, :params [Double/TYPE]
+          :args [Double/TYPE]}))
+  (deftest extraction-1.2 ;; 1.2-specific: ignore .invokePrim
+    (are [meth sig] (= (extract-signature meth) sig)
+         ;; nullary priminvoke
+         (the-method System 'currentTimeMillis)
+         {:prim nil, :ret Long/TYPE,
+          :params [], :args []})))
+
 (deftest test-normalize-signatures
   (are [sigs norm-sigs] (= (set (collapse-sigs sigs)) (set norm-sigs))
        ;; individual
@@ -91,20 +107,6 @@ invoked method about the signature that was used."
         ;; preserve :ret
         {:prim clojure.lang.IFn$LOL :ret Long/TYPE
          :params [Long/TYPE Object] :args nil}]))
-
-(if capable-prim-invoke?
-  (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
-    (are [meth sig] (= (extract-signature meth) sig)
-         ;; nullary priminvoke
-         (the-method System 'currentTimeMillis)
-         {:prim clojure.lang.IFn$L, :ret Long/TYPE,
-          :params [], :args []}))
-  (deftest extraction-1.2 ;; 1.2-specific: ignore .invokePrim
-    (are [meth sig] (= (extract-signature meth) sig)
-         ;; nullary priminvoke
-         (the-method System 'currentTimeMillis)
-         {:prim nil, :ret Long/TYPE,
-          :params [], :args []})))
 
 (def-statics Math E abs)
 
