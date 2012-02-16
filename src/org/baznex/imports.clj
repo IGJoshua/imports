@@ -132,7 +132,7 @@ invokePrim can provide."
   "Produce a single invocation from a signature."
   [^Class cls, ^String name, {:keys [prim ret params args]}]
   (let [proxargs (repeatedly (count params) (partial gensym 'p_))]
-    `(~(with-meta 'invoke {:tag ret}) ;;TODO: Need to normalize ret when !prim?
+    `(~(with-meta (if prim 'invokePrim 'invoke) {:tag ret})
       [~@(map #(with-meta %1 {:tag %2}) proxargs params)]
         (. ~(symbol (.getName cls))
            ~(symbol name)
@@ -143,13 +143,12 @@ invokePrim can provide."
 (defn ^:internal emit-methods
   "Produce a definition form for a set of static methods with the same name."
   [^Class cls, ^String name, meths]
-  (let [arities (distinct (map #(count (.getParameterTypes ^Method %)) meths))]
+  (let [sigs (collapse-sigs (map extract-signature meths))
+        interfaces (-> (map :prim sigs) distinct set (disj nil))]
     `(def ~(priv-sym cls name)
-       (proxy [clojure.lang.AFn] []
-         ~@(for [ary arities]
-             (invocation cls name {:prim false,
-                                   :ret Object,
-                                   :params (repeat ary [Object])}))))))
+       (proxy [clojure.lang.AFn ~@(map #(symbol (.getName ^Class %))
+                                       interfaces)] []
+         ~@(map (partial invocation cls name) sigs)))))
 
 (defn ^:internal emit-field
   [^Class cls, ^Field fld]
