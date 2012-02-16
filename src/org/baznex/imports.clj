@@ -10,7 +10,8 @@
 (ns org.baznex.imports
   "Import static Java methods/fields into Clojure"
   (:use clojure.set)
-  (:import (java.lang.reflect Method Field Modifier)))
+  (:import (java.lang.reflect Method Field Modifier)
+           (clojure.lang Util ISeq IFn AFn ArityException)))
 
 ;;;; Old, deprecated stuff
 
@@ -64,6 +65,23 @@
       (< 2 (:minor *clojure-version*))))
 
 ;;;; def-statics
+
+(defn tag
+  "Provide a suitable value for :tag for use in macros."
+  [^Class c]
+  (cond
+   (nil? c) nil
+   (.isArray c) (.getName c)
+   :else (symbol (.getName c))))
+
+(defn emit-cast
+  "Emit expression with casting or type hinting as appropriate."
+  [^Class c, expr]
+  (cond
+   (nil? c) expr
+   (= c Void/TYPE) (throw (IllegalArgumentException. "Cannot cast to void"))
+   (.isPrimitive c) (list (tag c) expr)
+   :else (with-meta expr {:tag (tag c)})))
 
 (defn ^:internal priv-sym
   "Produce a private name (with minimal docs) for imported statics."
@@ -130,25 +148,59 @@ invokePrim can provide."
 
 (defn ^:internal invocation
   "Produce a single invocation from a signature."
-  [^Class cls, ^String name, {:keys [prim ret params args]}]
-  (let [proxargs (repeatedly (count params) (partial gensym 'p_))]
-    `(~(with-meta (if prim 'invokePrim 'invoke) {:tag ret})
-      [~@(map #(with-meta %1 {:tag %2}) proxargs params)]
+  [^Class cls, ^String name, {:keys [prim ret params args] :as sig}]
+  (when (> (count params) 20)
+    (throw (RuntimeException.
+            "def-statics does not yet support methods with > 20 params")))
+  (let [proxargs (repeatedly (count params) (partial gensym 'p_))
+        invoke-name (if prim
+                      (with-meta 'invokePrim
+                        {:tag (tag (normalize-param ret))})
+                      'invoke)]
+    `(~invoke-name
+      [this# ~@(map #(with-meta %1 {:tag (tag %2)}) proxargs params)]
+        (println "Invoked" ~(pr-str sig)) ;; TODO remove debugging statement
         (. ~(symbol (.getName cls))
            ~(symbol name)
            ~@(if (seq args)
-               (map #(with-meta %1 {:tag %2}) proxargs args)
+               (map #(emit-cast %2 %1) proxargs args)
                proxargs)))))
 
 (defn ^:internal emit-methods
   "Produce a definition form for a set of static methods with the same name."
   [^Class cls, ^String name, meths]
   (let [sigs (collapse-sigs (map extract-signature meths))
-        interfaces (-> (map :prim sigs) distinct set (disj nil))]
+        by-type (group-by :prim sigs)
+        ;; primitive-invocables as map of class [sig]
+        prims (dissoc by-type nil)
+        ;; IFn invocables as map of arity -> [sig]
+        by-arity (group-by (comp count :params) (by-type nil []))]
     `(def ~(priv-sym cls name)
-       (proxy [clojure.lang.AFn ~@(map #(symbol (.getName ^Class %))
-                                       interfaces)] []
-         ~@(map (partial invocation cls name) sigs)))))
+       (reify
+         ;; first IFn itself
+         IFn
+         (~'call [this#] (.invoke ^IFn this#))
+         (^void ~'run [this#]
+           (try (.invoke ^IFn this#)
+                (catch Exception e#
+                  (throw (Util/runtimeException e#)))))
+         (~'applyTo [^IFn this#, ^ISeq arglist#]
+           (AFn/applyToHelper this# arglist#))
+         ~@(for [ary (range 21)
+                 :let [requested (by-arity ary)]]
+             (if requested
+               (invocation cls name (first requested))
+               `(~'invoke [^IFn this# ~@(repeatedly ary #(gensym 'arg))]
+                          (throw (ArityException.
+                                  ~ary ~(str (.getName cls) "/" name))))))
+         (~'invoke [^IFn this# ~@(repeatedly 20 #(gensym 'arg))
+                    ^"[Ljava.lang.Object;" args#]
+           (throw (RuntimeException.
+                   "Not yet implemented: 20 + vararg def-statics invoke")))
+         ;; And now the prims
+         ~@(mapcat (fn [[^Class pcls, [sig]]]
+                     [(symbol (.getName pcls)) (invocation cls name sig)])
+             prims)))))
 
 (defn ^:internal emit-field
   [^Class cls, ^Field fld]
