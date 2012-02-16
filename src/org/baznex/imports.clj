@@ -117,24 +117,16 @@ invokePrim can provide."
      :params par-norm
      :args par-actual}))
 
-(defn ^:internal normalize-signatures
-  "Takes a seq of signature maps and returns a new seq of signature maps
-  containing those maps whose :prim key was non-nil and replaces the rest with
-  non-primitive versions with duplicates removed."
+(defn ^:internal collapse-sigs
+  "Collapse signatures together that must use the same .invoke or .invokePrim."
   [sigs]
-  (let [prims (filter #(:prim %) sigs)
-        nonprims (filter #(nil? (:prim %)) sigs)
-        by-num-args (group-by #(count (:params %)) nonprims)
-        normnonprims (doto (for [[k v] (seq by-num-args)
-                                 :let [sig {:prim nil
-                                            :ret Object
-                                            :params (vec (repeat k Object))
-                                            :args nil}]]
-                             (if (= 1 (count v))
-                               (assoc sig :args (:args (first v))
-                                      :ret (:ret (first v)))
-                               sig)) prn)]
-    (concat prims normnonprims)))
+  (for [[invocation sgroup] (group-by #(select-keys % [:prim :params]) sigs)
+        :let [sample (first sgroup)]]
+    (if (= 1 (count sgroup))
+      sample
+      (-> invocation
+          (assoc :ret (if (:prim invocation) (:ret sample) Object))
+          (assoc :args nil)))))
 
 (defn ^:internal invocation
   "Produce a single invocation from a signature."

@@ -65,22 +65,32 @@ invoked method about the signature that was used."
         :params [Object], :args [Float/TYPE]}))
 
 (deftest test-normalize-signatures
-  (are [sigs norm-sigs] (= (normalize-signatures sigs) norm-sigs)
+  (are [sigs norm-sigs] (= (set (collapse-sigs sigs)) (set norm-sigs))
+       ;; individual
        [{:prim clojure.lang.IFn$LL :ret Long/TYPE :params [Long/TYPE]
          :args [Long/TYPE]}
         {:prim clojure.lang.IFn$DD :ret Double/TYPE :params [Double/TYPE]
          :args [Double/TYPE]}
+        ;; colliding .invoke
         {:prim nil :ret Float/TYPE :params [Object] :args [Float/TYPE]}
         {:prim nil :ret Integer/TYPE :params [Object] :args [Integer/TYPE]}
-        {:prim nil :ret Void/TYPE :params [Object Object]
-         :args [String String]}]
+        ;; void return
+        {:prim nil :ret Void/TYPE :params [Object Object] :args [String String]}
+        ;; colliding .invokePrim
+        {:prim clojure.lang.IFn$LOL :ret Long/TYPE
+         :params [Long/TYPE Object] :args [Long/TYPE String]}
+        {:prim clojure.lang.IFn$LOL :ret Long/TYPE
+         :params [Long/TYPE Object] :args [Long/TYPE Class]}]
        [{:prim clojure.lang.IFn$LL :ret Long/TYPE :params [Long/TYPE]
          :args [Long/TYPE]}
         {:prim clojure.lang.IFn$DD :ret Double/TYPE :params [Double/TYPE]
          :args [Double/TYPE]}
         {:prim nil :ret Object :params [Object] :args nil}
-        {:prim nil :ret Void/TYPE :params [Object Object]
-         :args [String String]}]))
+        ;; preserve void return type
+        {:prim nil :ret Void/TYPE :params [Object Object] :args [String String]}
+        ;; preserve :ret
+        {:prim clojure.lang.IFn$LOL :ret Long/TYPE
+         :params [Long/TYPE Object] :args nil}]))
 
 (if capable-prim-invoke?
   (deftest extraction-1.3 ;; 1.3-specific: require .invokePrim
