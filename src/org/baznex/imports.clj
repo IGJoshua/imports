@@ -61,8 +61,13 @@
 ;;;; helpers
 
 (def capable-prim-invoke?
-  (or (< 1 (:major *clojure-version*))
-      (< 2 (:minor *clojure-version*))))
+  ;; TODO fix prim invoking, then re-enable this!
+  ;; The biggest problem right now is that we should duplicate prim-invoked
+  ;; methods as regular invoke, and we don't. System/currentTimeMillis is
+  ;; a good example of this.
+  false
+  #_ (or (< 1 (:major *clojure-version*))
+         (< 2 (:minor *clojure-version*))))
 
 ;;;; def-statics
 
@@ -197,7 +202,8 @@ invokePrim can provide."
                     ^"[Ljava.lang.Object;" args#]
            (throw (RuntimeException.
                    "Not yet implemented: 20 + vararg def-statics invoke")))
-         ;; And now the prims
+         ;; And now the prims:
+         ;; interleaving IFn subinterfaces and invokePrim impls
          ~@(mapcat (fn [[^Class pcls, [sig]]]
                      [(symbol (.getName pcls)) (invocation cls name sig)])
              prims)))))

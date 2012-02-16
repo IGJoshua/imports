@@ -46,14 +46,16 @@ invoked method about the signature that was used."
   [cls meth-name & types]
   (.getMethod cls (name meth-name) (into-array Class types)))
 
-(deftest test-find-prim-invoke
-  (are [ret params interface] (= (find-prim-invoke ret params) interface)
-       Long/TYPE [] clojure.lang.IFn$L
-       Long/TYPE [Object Long/TYPE] clojure.lang.IFn$OLL
-       Double/TYPE [Object Object Object] clojure.lang.IFn$OOOD
-       Object [Double/TYPE Object] clojure.lang.IFn$DOO
-       Double/TYPE [Long/TYPE Object Double/TYPE] clojure.lang.IFn$LODD
-       Object [Double/TYPE Long/TYPE Object Long/TYPE] clojure.lang.IFn$DLOLO))
+(when capable-prim-invoke?
+  (deftest test-find-prim-invoke
+    (are [ret params interface] (= (find-prim-invoke ret params) interface)
+         Long/TYPE [] clojure.lang.IFn$L
+         Long/TYPE [Object Long/TYPE] clojure.lang.IFn$OLL
+         Double/TYPE [Object Object Object] clojure.lang.IFn$OOOD
+         Object [Double/TYPE Object] clojure.lang.IFn$DOO
+         Double/TYPE [Long/TYPE Object Double/TYPE] clojure.lang.IFn$LODD
+         Object [Double/TYPE Long/TYPE Object Long/TYPE] clojure.lang.IFn$DLOLO
+         )))
 
 ;; Note that we're testing against some instance methods (for convenience.)
 
