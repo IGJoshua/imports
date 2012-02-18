@@ -11,7 +11,7 @@
   "Import static Java methods/fields into Clojure"
   (:use clojure.set)
   (:import (java.lang.reflect Method Field Modifier)
-           (clojure.lang Util ISeq IFn AFn ArityException)))
+           (clojure.lang AFn)))
 
 ;;;; Old, deprecated stuff
 
@@ -58,17 +58,6 @@
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
 
-;;;; helpers
-
-(def capable-prim-invoke?
-  ;; TODO fix prim invoking, then re-enable this!
-  ;; The biggest problem right now is that we should duplicate prim-invoked
-  ;; methods as regular invoke, and we don't. System/currentTimeMillis is
-  ;; a good example of this.
-  false
-  #_ (or (< 1 (:major *clojure-version*))
-         (< 2 (:minor *clojure-version*))))
-
 ;;;; def-statics
 
 (defn tag
@@ -97,116 +86,53 @@
              :doc (str (.getCanonicalName cls) "/" name " via def-statics")))
 
 ;; Sample signature:
-;; {:prim true,
-;;  :ret Object,
-;;  :params [Long/TYPE Double/TYPE Object]
+;; {:arity 3
 ;; ?:args [Long/TYPE Double/TYPE String] ; optional
 ;; }
 
-(def ^:internal invocable-prims #{Long/TYPE Double/TYPE})
-
-(defn ^:internal normalize-param
-  "Normalize a parameter's class to Long/TYPE, Double/TYPE, or Object."
-  [^Class cls]
-  (get invocable-prims cls Object))
-
-(defn ^:internal find-prim-invoke
-  "Find a subinterface of IFn that provides a primitive invocation method,
-e.g. IFn$LOLD. Return type and params are assumed to be normalized already."
-  [ret params]
-  (when capable-prim-invoke?
-    (when (and (<= (count params) 4)
-               (or (contains? invocable-prims ret)
-                   (some invocable-prims params)))
-      (let [subtype (apply str (map {Object \O, Long/TYPE \L, Double/TYPE \D}
-                                    (concat params [ret])))]
-        (resolve (symbol (str "clojure.lang.IFn$" subtype)))))))
-
 (defn ^:internal extract-signature
-  "Given a method, return the signature as a map of :prim (IFn subinterface
-that this invocation can match, or nil), :ret (declared class of return type),
-and :params (sequence of classes of parameters for invocation), and
+  "Given a method, return the signature as a map of :arity (integer) and
 :args (sequence of the declared parameter classes of the static method.)
 
-:args is intended for use when the dispatch is unambiguous but the
-actual parameters of the static method are narrower than what invoke or
-invokePrim can provide."
+:args is intended for use when the dispatch is unambiguous but the actual
+parameters of the static method are narrower than what invoke can provide."
   [^Method meth]
-  (let [ret-type (.getReturnType meth)
-        par-actual (vec (seq (.getParameterTypes meth)))
-        par-norm (map normalize-param par-actual)]
-    {:prim (find-prim-invoke (normalize-param ret-type) par-norm)
-     :ret ret-type
-     :params par-norm
+  (let [par-actual (vec (seq (.getParameterTypes meth)))]
+    {:arity (count par-actual)
      :args par-actual}))
 
 (defn ^:internal collapse-sigs
-  "Collapse signatures together that must use the same .invoke or .invokePrim."
+  "Collapse signatures together that must use the same .invoke."
   [sigs]
-  (for [[invocation sgroup] (group-by #(select-keys % [:prim :params]) sigs)
+  (for [[ary sgroup] (group-by :arity sigs)
         :let [sample (first sgroup)]]
     (if (= 1 (count sgroup))
       sample
-      (-> invocation
-          (assoc :ret (if (:prim invocation) (:ret sample) Object))
-          (assoc :args nil)))))
+      {:arity ary, :args nil})))
 
 (defn ^:internal invocation
   "Produce a single invocation from a signature."
-  [^Class cls, ^String name, {:keys [prim ret params args] :as sig}]
-  (when (> (count params) 20)
+  [^Class cls, ^String name, {:keys [arity args] :as sig}]
+  (when (> arity 20)
     (throw (RuntimeException.
             "def-statics does not yet support methods with > 20 params")))
-  (let [proxargs (repeatedly (count params) (partial gensym 'p_))
-        invoke-name (if prim
-                      (with-meta 'invokePrim
-                        {:tag (tag (normalize-param ret))})
-                      'invoke)]
-    `(~invoke-name
-      [this# ~@(map #(with-meta %1 {:tag (tag %2)}) proxargs params)]
-        (println "Invoked" ~(pr-str sig)) ;; TODO remove debugging statement
-        (. ~(symbol (.getName cls))
-           ~(symbol name)
-           ~@(if (seq args)
-               (map #(emit-cast %2 %1) proxargs args)
-               proxargs)))))
+  (let [proxargs (repeatedly arity (partial gensym 'p_))]
+    `(~'invoke
+      [~@proxargs]
+      (. ~(symbol (.getName cls))
+         ~(symbol name)
+         ~@(if (seq args)
+             (map #(emit-cast %2 %1) proxargs args)
+             proxargs)))))
 
 (defn ^:internal emit-methods
   "Produce a definition form for a set of static methods with the same name."
   [^Class cls, ^String name, meths]
-  (let [sigs (collapse-sigs (map extract-signature meths))
-        by-type (group-by :prim sigs)
-        ;; primitive-invocables as map of class [sig]
-        prims (dissoc by-type nil)
-        ;; IFn invocables as map of arity -> [sig]
-        by-arity (group-by (comp count :params) (by-type nil []))]
+  (let [sigs (collapse-sigs (map extract-signature meths))]
     `(def ~(priv-sym cls name)
-       (reify
-         ;; first IFn itself
-         IFn
-         (~'call [this#] (.invoke ^IFn this#))
-         (^void ~'run [this#]
-           (try (.invoke ^IFn this#)
-                (catch Exception e#
-                  (throw (Util/runtimeException e#)))))
-         (~'applyTo [^IFn this#, ^ISeq arglist#]
-           (AFn/applyToHelper this# arglist#))
-         ~@(for [ary (range 21)
-                 :let [requested (by-arity ary)]]
-             (if requested
-               (invocation cls name (first requested))
-               `(~'invoke [^IFn this# ~@(repeatedly ary #(gensym 'arg))]
-                          (throw (ArityException.
-                                  ~ary ~(str (.getName cls) "/" name))))))
-         (~'invoke [^IFn this# ~@(repeatedly 20 #(gensym 'arg))
-                    ^"[Ljava.lang.Object;" args#]
-           (throw (RuntimeException.
-                   "Not yet implemented: 20 + vararg def-statics invoke")))
-         ;; And now the prims:
-         ;; interleaving IFn subinterfaces and invokePrim impls
-         ~@(mapcat (fn [[^Class pcls, [sig]]]
-                     [(symbol (.getName pcls)) (invocation cls name sig)])
-             prims)))))
+       (proxy [AFn] []
+         ~@(for [sig sigs]
+             (invocation cls name sig))))))
 
 (defn ^:internal emit-field
   [^Class cls, ^Field fld]
@@ -214,7 +140,7 @@ invokePrim can provide."
   `(def ~(priv-sym cls (.getName fld))
      (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
 
-(defmacro ^{:since "1.4.0"} def-statics
+(defmacro def-statics
   "\"Imports\" the named static fields and/or static methods of the class
   as (private) symbols in the current namespace.
 
@@ -226,9 +152,8 @@ invokePrim can provide."
       user=> (sqrt 16)
       4.0
 
-  Note: Reflection and primitive boxing will be used with all methods.
-  TODO: Only do that for methods whose signatures are not listed in
-    clojure.lang.IFn."
+  Note: Primitive boxing will be used with all methods. Reflection will only
+be used where two overloads share an arity."
   [class-sym & fields-and-methods]
   (if-let [cls (resolve class-sym)]
     (let [only (set (map str fields-and-methods))

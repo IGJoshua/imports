@@ -1,0 +1,119 @@
+Cached from http://www.brainonfire.net/blog/hof-vs-prim-invoke-clojure/ by Tim McCormack.
+
+<h3>On the immiscibility of higher order functions and unboxed invocation in Clojure</h3>
+
+<p>Recently, <a href="http://timmciver.com/">Tim McIver</a> and I set out to bring <a href="http://clojuredocs.org/clojure_contrib/1.2.0/clojure.contrib.import-static">clojure.contrib.import-static</a> into the modern world. This is lib that looks on the surface to be quite handy: <code>(import-static java.lang.Math sqrt PI)</code> allows you to write <code>(sqrt PI)</code> instead of <code>(Math/sqrt Math/PI)</code>. The huge downside is that <code>sqrt</code> is a macro, so it can't be passed around as in <code>(map sqrt (range 10))</code>. (This <em>does</em> allow (with appropriate hinting) primitive invocation (non-boxed passing of primitive JVM types such as long and double) and reflection at compile-time instead of runtime.) Our idea was to replace import-static with def-statics, a macro that could produce prim-invocable functions instead of macros.</p>
+
+<p>Summary: You can't actually do that. HOFs in a dynamically-typed language are not compatible with unboxed primitive invocation.</p>
+
+<!--more-->
+
+<p>Our <a href="https://github.com/baznex/imports/blob/44b12db813c2605d1c6b0492018070091f736f9c/src/org/baznex/imports.clj">first pass</a> used <a href="http://clojuredocs.org/clojure_core/1.3.0/clojure.core/proxy">proxy</a> to create a fn that implemented <a href="https://github.com/clojure/clojure/blob/1.3.x/src/jvm/clojure/lang/AFn.java">clojure.lang.AFn</a>, a convenience implementation of IFn, which is the interface the compiler uses to recognize function-like things. For reasons that I am not well-versed in, IFn declares 21 arities of invoke (among other methods) that all take and return Objects. AFn implements these with throwing methods that can be overridden. Besides the fairly involved <code>gen-class</code>, <code>proxy</code> is the only API Clojure provides for subclassing a concrete class, which is a highly discouraged action. (We didn't want to reimplement AFn in order to use reify -- it was more work than necessary.) We finally managed to produce code like this:</p>
+
+<pre class="code">user=&gt; (binding [*print-meta* true] (clojure.pprint/pprint (macroexpand-1 '(org.baznex.imports/def-statics Math abs))))
+(do
+ (def
+  ^{:doc "java.lang.Math/abs via def-statics", :private true} abs
+  (clojure.core/proxy
+   [clojure.lang.AFn clojure.lang.IFn$LL clojure.lang.IFn$DD] []
+   (^java.lang.Object invoke [^java.lang.Object p_167]
+                      (. java.lang.Math abs p_167))
+   (^long invokePrim [^long p_168]
+          (. java.lang.Math abs ^long p_168))
+   (^double invokePrim [^double p_169]
+            (. java.lang.Math abs ^double p_169)))))</pre>
+
+<p>This gets us an implementation not just of IFn, allowing the compiler to pick it up as a function, but also as an IFn$LL and IFn$DD -- 2 of <a href="https://github.com/clojure/clojure/blob/1.3.x/src/jvm/clojure/lang/IFn.java#L91">358 special interfaces introduced in Clojure 1.3.0</a> that indicate that the function is capable of being invoked with or returning an unboxed primitive.</p>
+
+<p>And that's when we discovered that <code>proxy</code> only supports overloading by arity:</p>
+
+<pre class="code">user=&gt; (org.baznex.imports/def-statics Math abs)
+CompilerException java.lang.IllegalArgumentException: Method 'invokePrim' redefined, compiling:(NO_SOURCE_PATH:4)</pre>
+
+<p>I bit the bullet and <a href="https://github.com/baznex/imports/blob/7754d3a565a4db47b68cdf1e86bb6edf6bb8cbbd/src/org/baznex/imports.clj">rewrote</a> def-statics using <code><a href="http://clojuredocs.org/clojure_core/1.3.0/clojure.core/reify">reify</a></code> instead. This meant writing something to loop through all 21 possible arities of <code>invoke</code> (as well as some extra methods), but it got done. The output was horrible (and this is the short version:)</p>
+
+<pre class="code">user=&gt; (binding [*print-meta* true] (clojure.pprint/pprint (macroexpand-1 '(org.baznex.imports/def-statics Math abs))))
+(do
+ (def
+  ^{:doc "java.lang.Math/abs via def-statics", :private true} abs
+  (clojure.core/reify
+
+   clojure.lang.IFn
+
+   ;; eliding .run, .call, and .applyTo
+   (invoke
+    [^clojure.lang.IFn this__144__auto__]
+    (throw (clojure.lang.ArityException. 0 "java.lang.Math/abs")))
+   (invoke
+    [this__137__auto__ ^java.lang.Object p_449]
+    (clojure.core/println "Invoked"
+     "{:args nil, :ret java.lang.Object, :params (java.lang.Object), :prim nil}")
+    (. java.lang.Math abs p_449))
+   (invoke
+    [^clojure.lang.IFn this__144__auto__ arg450 arg451]
+    (throw (clojure.lang.ArityException. 2 "java.lang.Math/abs")))
+   (invoke
+    [^clojure.lang.IFn this__144__auto__ arg452 arg453 arg454]
+    (throw (clojure.lang.ArityException. 3 "java.lang.Math/abs")))
+   (invoke
+    [^clojure.lang.IFn this__144__auto__ arg455 arg456 arg457 arg458]
+    (throw (clojure.lang.ArityException. 4 "java.lang.Math/abs")))
+   (invoke
+    [^clojure.lang.IFn this__144__auto__ arg459 arg460 arg461 arg462 arg463]
+    (throw (clojure.lang.ArityException. 5 "java.lang.Math/abs")))
+   ;; eliding arities 6 through 19
+   (invoke
+    [^clojure.lang.IFn this__144__auto__ arg639 arg640 arg641 arg642 arg643
+     arg644 arg645 arg646 arg647 arg648 arg649 arg650 arg651 arg652 arg653
+     arg654 arg655 arg656 arg657 arg658]
+    (throw (clojure.lang.ArityException. 20 "java.lang.Math/abs")))   
+   ;; eliding the weird varargs arity
+
+   clojure.lang.IFn$LL
+
+   (^long invokePrim
+    [this__137__auto__ ^long p_447]
+    (clojure.core/println
+     "Invoked"
+     "{:prim clojure.lang.IFn$LL, :ret long, :params (long), :args [long]}")
+    (. java.lang.Math abs (long p_447)))
+
+   clojure.lang.IFn$DD
+
+   (^double invokePrim
+    [this__137__auto__ ^double p_448]
+    (clojure.core/println
+     "Invoked"
+     "{:prim clojure.lang.IFn$DD, :ret double, :params (double), :args [double]}")
+    (. java.lang.Math abs (double p_448))))))</pre>
+
+<p>Note the debugging printlns -- they were the only way I could tell if prim-invocation was occurring. Let's see it in action:</p>
+
+<pre class="code">user=&gt; (abs (long 5))
+Invoked {:args nil, :ret java.lang.Object, :params (java.lang.Object), :prim nil}
+5</pre>
+
+<p>Oops! We're only getting .invoke, not .invokePrim. With a little <a href="https://github.com/clojure/clojure/blob/1.3.x/src/jvm/clojure/lang/Compiler.java#L3472">poking around in clojure.lang.Compiler</a>, I discovered that arglists are important. Specifically, the type-hinting on the arglists. Here's an example of what they look like:</p>
+
+<pre class="code">user=&gt; (defn noop [^long x] nil)
+#'user/noop
+user=&gt; (binding [*print-meta* true] (prn (:arglists (meta #'noop))))
+([^long x])</pre>
+
+<p>This function is eligible for prim-invocation (that was a lie, and you'll see why in a minute) as confirmed by injecting some print statements into the compiler. So let's add some arglists to that reify!</p>
+
+<pre class="code">(do
+ (def
+   ^{:doc "java.lang.Math/abs via def-statics", :private true
+     :arglists `([^double x] [^long x] [x])} abs
+  (clojure.core/reify
+
+...</pre>
+
+<p>It doesn't work. Depending on exactly which function you try to reify, you'll get different results, so I'll just tell you the punchline: Compiler.java picks the first arity that matches the function call and runs with it. In this case, the <code>[^double x]</code> arglist is picked <em>every time</em>, leading to either casting, a cast exception, or a call to regular ol' .invoke. The compiler is completely incapable of choosing the correct IFn (or IFn$___ interface) invocation when there are multiple options for an arity.</p>
+
+<p>But wait, there's more! After further investigation, I discovered that <code>(map abs (range -3 3))</code> will <em>always</em> result in a call to invoke, or even worse, a runtime reflective call. Remember that <strong>:arglists is only present on the Var</strong>, not the IFn. (There's the lie exposed.) With <code>(abs -5)</code>, Compiler.java sees that the call-position of the expression is occupied by a reference to a Var, and it is able to look up arglist info at parse-time. (There's some def-hoisting going on here that I don't entirely follow yet.) The IFn itself isn't available until runtime in all other cases, such as <code>((if P=NP? abs-LL abs-DD) -5)</code>, so bytecode cannot be generated with full knowledge of what optimizations might be available. The takeaway here is that the compiler can only work with whatever type info is statically available at the callsite, and since prim-invocation is a property of the IFn, only Vars of IFns can be optimized for unboxed primitive invocation.</p>
+
+<p>And higher-order-functions? They pretty much <em>never</em> provide hinting information that the compiler could use. Remember that deep down inside <code>(map abs (range -3 3))</code>, the actual callsite we care about looks like <code>(f (first s))</code>. Completely vanilla. If we were using Java or Haskell or some other statically typed language, this information could be carried down inside the map call and used -- but Clojure is dynamic, so HOFs and prim invoke simply cannot mix.</p>
+
+<p><b>Postscript:</b> We plan to remove prim-invocation from the code and go back to proxy'ing AFn. We'll still be able to use hinting sometimes  for its other, completely different purpose: Avoiding reflection. For instance, String/valueOf has a single ternary overload, so we can hint the actual call inside the ternary invoke. Farther down the road, we may combine def-statics and import-static so that users can choose whether they'd like each "import" to be a hinting macro or a boxing, reflecting function.</p>
