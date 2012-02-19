@@ -112,28 +112,29 @@ parameters of the static method are narrower than what invoke can provide."
       {:arity ary, :args nil})))
 
 (defn ^:internal invocation
-  "Produce a single invocation from a signature."
+  "Produce a single invocation arity implementation from a signature."
   [^Class cls, ^String name, {:keys [arity args] :as sig}]
   (when (> arity 20)
     (throw (RuntimeException.
             "def-statics does not yet support methods with > 20 params")))
   (let [proxargs (repeatedly arity (partial gensym 'p_))]
-    `(~'invoke
-      [~@proxargs]
-      (. ~(symbol (.getName cls))
-         ~(symbol name)
-         ~@(if (seq args)
-             (map #(emit-cast %2 %1) proxargs args)
-             proxargs)))))
+    `([~@proxargs]
+        (. ~(symbol (.getName cls))
+           ~(symbol name)
+           ~@(if (seq args)
+               (map #(emit-cast %2 %1) proxargs args)
+               proxargs)))))
 
 (defn ^:internal emit-methods
-  "Produce a definition form for a set of static methods with the same name."
+  "Produce a definition form for a non-empty collection of static methods
+with the same name."
   [^Class cls, ^String name, meths]
   (let [sigs (collapse-sigs (map extract-signature meths))]
     `(def ~(priv-sym cls name)
        (proxy [AFn] []
-         ~@(for [sig sigs]
-             (invocation cls name sig))))))
+         (~'invoke
+           ~@(for [sig sigs]
+               (invocation cls name sig)))))))
 
 (defn ^:internal emit-field
   [^Class cls, ^Field fld]

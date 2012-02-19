@@ -62,7 +62,7 @@ invoked method about the signature that was used."
         ;; only collapse
         {:arity 1, :args nil}]))
 
-(def-statics Math E abs)
+(def-statics Math E abs) ;; collapses to a single invoke
 
 (deftest test-def-statics
   (is (= (map abs (range -2 3)) [2 1 0 1 2])))
@@ -80,3 +80,5 @@ invoked method about the signature that was used."
 (deftest test-missing
   (is (thrown? Throwable
                (macroexpand-1 `(def-statics Math flurb narble grok)))))
+
+(def-statics String valueOf) ;; multiple invokes
