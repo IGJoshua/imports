@@ -99,3 +99,11 @@ invoked method about the signature that was used."
   (let [value-of (with-test-ns [(def-statics String valueOf)] valueOf)]
     (is (= (value-of true) "true"))
     (is (= (first (map value-of [(char-array "hello")] [1] [3])) "ell"))))
+
+(deftest multi-clause-statics
+  (let [[r s] (with-test-ns [(def-statics
+                               (String valueOf)
+                               (Math copySign cbrt))]
+                [(cbrt 8), ((identity valueOf) (copySign 25.0 -3.0))])]
+    (is (== r 2))
+    (is (= s "-25.0"))))

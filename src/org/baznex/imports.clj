@@ -142,20 +142,8 @@ with the same name."
   `(def ~(priv-sym cls (.getName fld))
      (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
 
-(defmacro def-statics
-  "\"Imports\" the named static fields and/or static methods of the class
-  as (private) symbols in the current namespace.
-
-  Example: 
-      user=> (def-statics java.lang.Math PI sqrt)
-      nil
-      user=> PI
-      3.141592653589793
-      user=> (sqrt 16)
-      4.0
-
-  Note: Primitive boxing will be used with all methods. Reflection will only
-be used where two overloads share an arity."
+(defn ^:internal emit-statics-clause
+  "Emit def-statics syntax for one clause."
   [class-sym & fields-and-methods]
   (if-let [cls (resolve class-sym)]
     (let [only (set (map str fields-and-methods))
@@ -177,8 +165,51 @@ be used where two overloads share an arity."
                         (clojure.string/join ", " missing)))))
       ;; OK, we're good to go
       `(do ~@(map (partial emit-field cls) fields)
-           ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)))
+           ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)
+           nil))
     (throw (ClassNotFoundException.
             (str "Could not resolve class " class-sym " for static import.")))))
 
 ;; TODO: Expose a build-static to allow custom defs
+
+(defmacro def-statics
+  "\"Imports\" the named static fields and/or static methods of the class
+as (private) symbols in the current namespace.
+
+Arguments are one or more clauses. A clause is a list containing a
+classname symbol followed by one or more static field and method symbols.
+For convenience, the arguments can instead be the contents of a single clause.
+
+Classnames will be resolved according to any imports that have taken effect
+by expansion time.
+
+Example:
+  user=> (def-statics Math PI sqrt)
+    nil
+  user=> (map sqrt [16 PI])
+    (4.0 1.7724538509055159)
+  user=> (doc sqrt)
+    -------------------------
+    user/sqrt
+      java.lang.Math/sqrt via def-statics
+    nil
+  user=> (def-statics (String valueOf) (Double parseDouble POSITIVE_INFINITY))
+    nil
+  user=> (valueOf (parseDouble \"+5.6\"))
+    \"5.6\"
+
+Primitive boxing will be used with all methods. Reflection will only
+be used where two overloads share an arity."
+  [& args]
+  (when (empty? args)
+    (throw (IllegalArgumentException. "def-statics not given any clauses")))
+  (let [clauses (if (sequential? (first args)) args (list (seq args)))]
+    ;; Reserve vectors for future syntax
+    (when-not (and (every? sequential? clauses)
+                   (every? (complement associative?) clauses))
+      (throw (IllegalArgumentException.
+              "At least one clause was not a list.")))
+    `(do
+       ~@(for [clause clauses]
+           (apply emit-statics-clause clause))
+       nil)))
