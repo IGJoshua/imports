@@ -9,7 +9,8 @@
 
 (ns org.baznex.imports
   "Import static Java methods/fields into Clojure"
-  (:use clojure.set)
+  (:require clojure.string)
+  (:use [clojure.set :only (intersection difference)])
   (:import (java.lang.reflect Method Field Modifier)
            (clojure.lang AFn)))
 
@@ -163,6 +164,17 @@ be used where two overloads share an arity."
           fields (filter todo? (.getFields cls))
           methods-by-name (group-by #(.getName ^Method %)
                                     (filter todo? (.getMethods cls)))]
+      ;; a little friendly error checking first
+      (when-let [missing (seq (difference
+                               only
+                               (set (keys methods-by-name))
+                               (set (map #(.getName ^Field %) fields))))]
+        (throw (IllegalArgumentException.
+                (format (str "def-statics did not find these fields "
+                             "or methods in class %s: %s")
+                        (.getName cls)
+                        (clojure.string/join ", " missing)))))
+      ;; OK, we're good to go
       `(do ~@(map (partial emit-field cls) fields)
            ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)))
     (throw (ClassNotFoundException.

@@ -76,3 +76,7 @@ invoked method about the signature that was used."
 (import '(java.awt Color))
 (deftest test-resolve ;; shouldn't need full qualification of imported classes
   (def-statics Color decode))
+
+(deftest test-missing
+  (is (thrown? Throwable
+               (macroexpand-1 `(def-statics Math flurb narble grok)))))
