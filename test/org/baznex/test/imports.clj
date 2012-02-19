@@ -82,3 +82,6 @@ invoked method about the signature that was used."
                (macroexpand-1 `(def-statics Math flurb narble grok)))))
 
 (def-statics String valueOf) ;; multiple invokes
+(deftest multi-arity
+  (is (= (valueOf true) "true"))
+  (is (= (first (map valueOf [(char-array "hello")] [1] [3])) "ell")))
