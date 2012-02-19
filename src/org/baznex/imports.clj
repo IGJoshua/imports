@@ -180,3 +180,5 @@ be used where two overloads share an arity."
            ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)))
     (throw (ClassNotFoundException.
             (str "Could not resolve class " class-sym " for static import.")))))
+
+;; TODO: Expose a build-static to allow custom defs

@@ -3,16 +3,24 @@
 to pollute this ns. However, that turns out to be more complicated than
 we'd like, so for now all the imports happen in the same ns."
   (:use clojure.test
+        org.baznex.imports
         org.baznex.test.utils
-        org.baznex.imports)
+        [org.timmc.handy :only (with-temp-ns)])
   (:import (org.baznex.test.imports Statics)))
 
-;; Due to some limitations of deftest, these imports apparently have to go
-;; outside.
-(import-static java.lang.Math PI sqrt)
+;;;; Test Helpers
+
+(defmacro with-test-ns
+  "Run tests in temporary namespace with org.baznex.imports already use'd."
+  [[& ns-exprs] & exprs]
+  `(with-temp-ns [(use 'org.baznex.imports) ~@ns-exprs]
+     ~@exprs))
+
+;;;; Deprecated stuff: import-static
 
 (deftest test-deprecated-import
-  (is (number? (sqrt PI))))
+  (is (number? (with-test-ns [(import-static java.lang.Math PI sqrt)]
+                 (sqrt PI)))))
 
 (import-static org.baznex.test.imports.Statics over)
 
@@ -62,26 +70,32 @@ invoked method about the signature that was used."
         ;; only collapse
         {:arity 1, :args nil}]))
 
-(def-statics Math E abs) ;; collapses to a single invoke
-
-(deftest test-def-statics
-  (is (= (map abs (range -2 3)) [2 1 0 1 2])))
+(deftest test-basic-def-statics
+  (is (= (with-test-ns [(def-statics Math E abs)]
+           (map abs (range -2 3)))
+         [2 1 0 1 2])))
 
 (deftest test-metadata
-  (is (:private (meta #'abs)))
-  (is (string? (:doc (meta #'abs))))
-  (is (:private (meta #'E)))
-  (is (string? (:doc (meta #'E)))))
+  (let [[abs E] (with-test-ns [(def-statics Math E abs)]
+                  [#'abs #'E])]
+    (is (:private (meta abs)))
+    (is (string? (:doc (meta abs))))
+    (is (:private (meta E)))
+    (is (string? (:doc (meta E))))))
 
-(import '(java.awt Color))
 (deftest test-resolve ;; shouldn't need full qualification of imported classes
-  (def-statics Color decode))
+  (is (= (-> (with-test-ns [(import '(java.awt Color))
+                            (def-statics Color decode)]
+               (decode "123456"))
+             class
+             .getName)
+         "java.awt.Color")))
 
 (deftest test-missing
   (is (thrown? Throwable
-               (macroexpand-1 `(def-statics Math flurb narble grok)))))
+               (eval `(def-statics Math flurb narble grok)))))
 
-(def-statics String valueOf) ;; multiple invokes
 (deftest multi-arity
-  (is (= (valueOf true) "true"))
-  (is (= (first (map valueOf [(char-array "hello")] [1] [3])) "ell")))
+  (let [value-of (with-test-ns [(def-statics String valueOf)] valueOf)]
+    (is (= (value-of true) "true"))
+    (is (= (first (map value-of [(char-array "hello")] [1] [3])) "ell"))))
