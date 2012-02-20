@@ -36,7 +36,7 @@ invoked method about the signature that was used."
        (over* (int 5)) "O/int"
        (over* (long 5)) "O/long"))
 
-;;;; def-statics
+;;;; def-proxied
 
 (defn the-method
   [cls meth-name & types]
@@ -70,13 +70,13 @@ invoked method about the signature that was used."
         ;; only collapse
         {:arity 1, :args nil}]))
 
-(deftest test-basic-def-statics
-  (is (= (with-test-ns [(def-statics Math E abs)]
+(deftest test-basic-def-proxied
+  (is (= (with-test-ns [(def-proxied Math E abs)]
            (map abs (range -2 3)))
          [2 1 0 1 2])))
 
 (deftest test-metadata
-  (let [[abs E] (with-test-ns [(def-statics Math E abs)]
+  (let [[abs E] (with-test-ns [(def-proxied Math E abs)]
                   [#'abs #'E])]
     (is (:private (meta abs)))
     (is (string? (:doc (meta abs))))
@@ -85,7 +85,7 @@ invoked method about the signature that was used."
 
 (deftest test-resolve ;; shouldn't need full qualification of imported classes
   (is (= (-> (with-test-ns [(import '(java.awt Color))
-                            (def-statics Color decode)]
+                            (def-proxied Color decode)]
                (decode "123456"))
              class
              .getName)
@@ -93,15 +93,15 @@ invoked method about the signature that was used."
 
 (deftest test-missing
   (is (thrown? Throwable
-               (eval `(def-statics Math flurb narble grok)))))
+               (eval `(def-proxied Math flurb narble grok)))))
 
 (deftest multi-arity
-  (let [value-of (with-test-ns [(def-statics String valueOf)] valueOf)]
+  (let [value-of (with-test-ns [(def-proxied String valueOf)] valueOf)]
     (is (= (value-of true) "true"))
     (is (= (first (map value-of [(char-array "hello")] [1] [3])) "ell"))))
 
 (deftest multi-clause-statics
-  (let [[r s] (with-test-ns [(def-statics
+  (let [[r s] (with-test-ns [(def-proxied
                                (String valueOf)
                                (Math copySign cbrt))]
                 [(cbrt 8), ((identity valueOf) (copySign 25.0 -3.0))])]

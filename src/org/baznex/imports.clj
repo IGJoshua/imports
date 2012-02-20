@@ -59,7 +59,7 @@
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
 
-;;;; def-statics
+;;;; def-proxied
 
 (defn tag
   "Provide a suitable value for :tag for use in macros."
@@ -84,7 +84,7 @@
   (vary-meta (symbol name)
              assoc
              :private true
-             :doc (str (.getCanonicalName cls) "/" name " via def-statics")))
+             :doc (str (.getCanonicalName cls) "/" name " via def-proxied")))
 
 ;; Sample signature:
 ;; {:arity 3
@@ -116,7 +116,7 @@ parameters of the static method are narrower than what invoke can provide."
   [^Class cls, ^String name, {:keys [arity args] :as sig}]
   (when (> arity 20)
     (throw (RuntimeException.
-            "def-statics does not yet support methods with > 20 params")))
+            "def-proxied does not yet support methods with > 20 params")))
   (let [proxargs (repeatedly arity (partial gensym 'p_))]
     `([~@proxargs]
         (. ~(symbol (.getName cls))
@@ -143,7 +143,7 @@ with the same name."
      (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
 
 (defn ^:internal emit-statics-clause
-  "Emit def-statics syntax for one clause."
+  "Emit def-proxied syntax for one clause."
   [class-sym & fields-and-methods]
   (if-let [cls (resolve class-sym)]
     (let [only (set (map str fields-and-methods))
@@ -159,7 +159,7 @@ with the same name."
                                (set (keys methods-by-name))
                                (set (map #(.getName ^Field %) fields))))]
         (throw (IllegalArgumentException.
-                (format (str "def-statics did not find these fields "
+                (format (str "def-proxied did not find these fields "
                              "or methods in class %s: %s")
                         (.getName cls)
                         (clojure.string/join ", " missing)))))
@@ -168,13 +168,13 @@ with the same name."
            ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)
            nil))
     (throw (ClassNotFoundException.
-            (str "Could not resolve class " class-sym " for static import.")))))
+            (str "Could not resolve class " class-sym " for proxying.")))))
 
-;; TODO: Expose a build-static to allow custom defs
+;; TODO: Expose a 'proxied macro to allow custom inline proxying w/o def
 
-(defmacro def-statics
-  "\"Imports\" the named static fields and/or static methods of the class
-as (private) symbols in the current namespace.
+(defmacro def-proxied
+  "Proxy the named static fields and/or static methods of the class
+as private vars in the current namespace.
 
 Arguments are one or more clauses. A clause is a list containing a
 classname symbol followed by one or more static field and method symbols.
@@ -184,16 +184,16 @@ Classnames will be resolved according to any imports that have taken effect
 by expansion time.
 
 Example:
-  user=> (def-statics Math PI sqrt)
+  user=> (def-proxied Math PI sqrt)
     nil
   user=> (map sqrt [16 PI])
     (4.0 1.7724538509055159)
   user=> (doc sqrt)
     -------------------------
     user/sqrt
-      java.lang.Math/sqrt via def-statics
+      java.lang.Math/sqrt via def-proxied
     nil
-  user=> (def-statics (String valueOf) (Double parseDouble POSITIVE_INFINITY))
+  user=> (def-proxied (String valueOf) (Double parseDouble POSITIVE_INFINITY))
     nil
   user=> (valueOf (parseDouble \"+5.6\"))
     \"5.6\"
@@ -202,7 +202,7 @@ Primitive boxing will be used with all methods. Reflection will only
 be used where two overloads share an arity."
   [& args]
   (when (empty? args)
-    (throw (IllegalArgumentException. "def-statics not given any clauses")))
+    (throw (IllegalArgumentException. "def-proxied not given any clauses")))
   (let [clauses (if (sequential? (first args)) args (list (seq args)))]
     ;; Reserve vectors for future syntax
     (when-not (and (every? sequential? clauses)
