@@ -31,4 +31,11 @@ public class Statics extends org.baznex.test.TestBase {
         got("OOOOOO");
         return 7L;
     }
+
+    /* JVM allows fields and methods with same name, even though it is a
+       terrible idea. */
+
+    public static String horrible = "OH GOD WHY";
+
+    public static String horrible() { return "WTF, seriously?"; }
 }

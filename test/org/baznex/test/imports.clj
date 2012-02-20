@@ -92,8 +92,14 @@ invoked method about the signature that was used."
          "java.awt.Color")))
 
 (deftest test-missing
-  (is (thrown? Throwable
-               (eval `(def-proxied Math flurb narble grok)))))
+  (is (thrown-with-msg? IllegalArgumentException #"did not find"
+        (eval '(def-proxied Math flurb narble grok)))))
+
+(deftest test-ambig
+  (is (thrown-with-msg? IllegalArgumentException #"ambiguous"
+        (eval '(def-proxied Statics horrible))))
+  ;; but no ambiguity when just asking for method
+  (is (instance? String ((proxied Statics horrible)))))
 
 (deftest multi-arity
   (let [value-of (proxied String valueOf)]

@@ -167,16 +167,22 @@ characteristics as def-proxied.)"
           fields (filter todo? (.getFields cls))
           methods-by-name (group-by #(.getName ^Method %)
                                     (filter todo? (.getMethods cls)))]
-      ;; a little friendly error checking first
-      (when-let [missing (seq (difference
-                               only
-                               (set (keys methods-by-name))
-                               (set (map #(.getName ^Field %) fields))))]
-        (throw (IllegalArgumentException.
-                (format (str "def-proxied did not find these fields "
-                             "or methods in class %s: %s")
-                        (.getName cls)
-                        (clojure.string/join ", " missing)))))
+      ;; confirm that discovered fields and methods form a partition of the
+      ;; requested static members
+      (let [mnames (set (keys methods-by-name))
+            fnames (set (map #(.getName ^Field %) fields))]
+        (when-let [ambig (seq (intersection fnames mnames))]
+          (throw (IllegalArgumentException.
+                  (format (str "def-proxied given ambiguous field "
+                               "and method names for class %s: %s")
+                          (.getName cls)
+                          (clojure.string/join ", " ambig)))))
+        (when-let [missing (seq (difference only fnames mnames))]
+          (throw (IllegalArgumentException.
+                  (format (str "def-proxied did not find these fields "
+                               "or methods in class %s: %s")
+                          (.getName cls)
+                          (clojure.string/join ", " missing))))))
       ;; OK, we're good to go
       `(do ~@(for [fld fields]
                `(def ~(priv-sym cls (.getName fld))
