@@ -96,7 +96,7 @@ invoked method about the signature that was used."
                (eval `(def-proxied Math flurb narble grok)))))
 
 (deftest multi-arity
-  (let [value-of (with-test-ns [(def-proxied String valueOf)] valueOf)]
+  (let [value-of (proxied String valueOf)]
     (is (= (value-of true) "true"))
     (is (= (first (map value-of [(char-array "hello")] [1] [3])) "ell"))))
 

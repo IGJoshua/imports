@@ -11,7 +11,7 @@
   "Import static Java methods/fields into Clojure"
   (:require clojure.string)
   (:use [clojure.set :only (intersection difference)])
-  (:import (java.lang.reflect Method Field Modifier)
+  (:import (java.lang.reflect Method Field Member Modifier)
            (clojure.lang AFn)))
 
 ;;;; Old, deprecated stuff
@@ -60,6 +60,11 @@
          ~@(map import-method methods-to-do))))
 
 ;;;; def-proxied
+
+(defn static?
+  "Return true if a class member is static."
+  [^Member m]
+  (Modifier/isStatic (.getModifiers m)))
 
 (defn tag
   "Provide a suitable value for :tag for use in macros."
@@ -125,22 +130,31 @@ parameters of the static method are narrower than what invoke can provide."
                (map #(emit-cast %2 %1) proxargs args)
                proxargs)))))
 
-(defn ^:internal emit-methods
-  "Produce a definition form for a non-empty collection of static methods
-with the same name."
-  [^Class cls, ^String name, meths]
+(defn ^:internal proxy-one-method
+  "Produce a proxy form for a collection of static methods with the same name."
+  [^Class cls, ^String mname, meths]
   (let [sigs (collapse-sigs (map extract-signature meths))]
-    `(def ~(priv-sym cls name)
-       (proxy [AFn] []
-         (~'invoke
-           ~@(for [sig sigs]
-               (invocation cls name sig)))))))
+    `(proxy [AFn] []
+       (~'invoke
+         ~@(for [sig sigs]
+             (invocation cls mname sig))))))
 
-(defn ^:internal emit-field
-  [^Class cls, ^Field fld]
-  {:pre [(instance? Field fld)]}
-  `(def ~(priv-sym cls (.getName fld))
-     (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
+(defmacro proxied
+  "Return a function that wraps the specified class method (with the same
+characteristics as def-proxied.)"
+  [class-sym method-sym]
+  (if-let [cls (resolve class-sym)]
+    (let [mname (name method-sym)
+          meths (filter (fn [^Method m]
+                          (and (static? m) (= (.getName m) mname)))
+                        (.getMethods cls))]
+      (when (empty? meths)
+        (throw (IllegalArgumentException.
+                (format "Could not find static method '%s' in %s" mname cls))))
+      ;; emit bare proxy form
+      (proxy-one-method cls mname meths))
+    (throw (ClassNotFoundException.
+            (format "Could not resolve class %s for proxying." class-sym)))))
 
 (defn ^:internal emit-statics-clause
   "Emit def-proxied syntax for one clause."
@@ -148,7 +162,7 @@ with the same name."
   (if-let [cls (resolve class-sym)]
     (let [only (set (map str fields-and-methods))
           todo? (fn [mem]
-                  (and (Modifier/isStatic (.getModifiers mem))
+                  (and (static? mem)
                        (contains? only (.getName mem))))
           fields (filter todo? (.getFields cls))
           methods-by-name (group-by #(.getName ^Method %)
@@ -164,13 +178,15 @@ with the same name."
                         (.getName cls)
                         (clojure.string/join ", " missing)))))
       ;; OK, we're good to go
-      `(do ~@(map (partial emit-field cls) fields)
-           ~@(map #(emit-methods cls (key %) (val %)) methods-by-name)
-           nil))
+      `(do ~@(for [fld fields]
+               `(def ~(priv-sym cls (.getName fld))
+                  (. ~(symbol (.getName cls)) ~(symbol (.getName fld)))))
+           ~@(for [[mname meths] methods-by-name]
+               `(def ~(priv-sym cls mname)
+                  ~(proxy-one-method cls mname meths)))
+           nil)) ;; TODO: A more interesting return value?
     (throw (ClassNotFoundException.
             (str "Could not resolve class " class-sym " for proxying.")))))
-
-;; TODO: Expose a 'proxied macro to allow custom inline proxying w/o def
 
 (defmacro def-proxied
   "Proxy the named static fields and/or static methods of the class
