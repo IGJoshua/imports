@@ -1,9 +1,6 @@
 # To do
 
-* Import-static methods as functions, not macros.
-** HotSpot inlining should take care of any performance concerns.
-** Will need proper type hinting!
-** Allow unrolled varargs? Could be confusing.
+* Allow unrolled varargs in #'proxied? Could be confusing.
 * import+ -- an advanced import statement
 ** class renaming
 ** statics folded in?
