@@ -9,7 +9,8 @@
 
 (ns org.baznex.imports
   "Import static Java methods/fields into Clojure"
-  (:require clojure.string)
+  (:require clojure.string
+            [clojure.reflect :as reflect])
   (:use [clojure.set :only (intersection difference)])
   (:import (java.lang.reflect Method Field Member Modifier)
            (clojure.lang AFn)))
@@ -58,6 +59,13 @@
                                           'args))))]
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
+
+(defmacro import-static-all [& clauses]
+  `(do
+     ~@(for [c classes]
+         `(import-static
+            ~c
+            ~@(map :name (:members (reflect/type-reflect c)))))))
 
 ;;;; Renaming imports
 
@@ -247,3 +255,11 @@ be used where two overloads share an arity."
        ~@(for [clause clauses]
            (apply emit-statics-clause clause))
        nil)))
+
+(defmacro def-proxied-all
+  [& classes]
+  `(do
+       ~@(for [c classes]
+           `(def-proxied
+              ~c
+              ~@(map :name (:members (reflect/type-reflect c)))))))
