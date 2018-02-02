@@ -7,7 +7,7 @@
 ;; agreeing to be bound by the terms of this license.  You must not
 ;; remove this notice, or any other, from this software.
 
-(ns org.baznex.imports
+(ns org.suskeyhose.imports
   "Import static Java methods/fields into Clojure"
   (:require clojure.string
             [clojure.reflect :as reflect])
@@ -60,7 +60,7 @@
     `(do ~@(map import-field fields-to-do)
          ~@(map import-method methods-to-do))))
 
-(defmacro import-static-all [& clauses]
+(defmacro import-static-all [& classes]
   `(do
      ~@(for [c classes]
          `(import-static
