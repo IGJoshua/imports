@@ -45,7 +45,7 @@
         fields-to-do (intersection all-fields only)
         methods-to-do (intersection all-methods only)
         make-sym (fn [string]
-                   (with-meta (symbol string) {:private true}))
+                   (with-meta (symbol string) {:private true :const true}))
         import-field (fn [name]
                        (list 'def (make-sym name)
                              (list '. class (symbol name))))
@@ -100,7 +100,8 @@ like (M/sqrt 5) inside subsequent top-level forms."
   (vary-meta (symbol name)
              assoc
              :private true
-             :doc (str (.getCanonicalName cls) "/" name " via def-proxied")))
+             :doc (str (.getCanonicalName cls) "/" name " via def-proxied")
+             :const true))
 
 ;; Sample signature:
 ;; {:arity 3
