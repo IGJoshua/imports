@@ -256,7 +256,7 @@ be used where two overloads share an arity."
            (apply emit-statics-clause clause))
        nil)))
 
-(defmacro def-proxied-all
+#_(defmacro def-proxied-all
   [& classes]
   `(do
        ~@(for [c classes]
