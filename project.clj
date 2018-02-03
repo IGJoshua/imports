@@ -1,4 +1,4 @@
-(defproject org.suskeyhose/imports "1.5.0"
+(defproject org.suskeyhose/imports "1.5.0-SNAPSHOT"
   :description "Unofficial migration of clojure.contrib.import-static"
   :url "https://github.com/baznex/import-static"
   :dependencies [[org.clojure/clojure "1.3.0"]]
